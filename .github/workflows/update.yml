@@ -13,6 +13,10 @@ permissions:
   contents: write
   pull-requests: write
 
+concurrency:
+  group: codex-release-update
+  cancel-in-progress: false
+
 jobs:
   check-update:
     runs-on: ubuntu-latest
