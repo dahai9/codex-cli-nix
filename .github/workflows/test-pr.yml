@@ -10,6 +10,8 @@ on:
 
 jobs:
   test-build:
+    env:
+      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
@@ -30,9 +32,10 @@ jobs:
 
       - name: Setup Nix cache
         uses: cachix/cachix-action@v15
+        if: env.CACHIX_AUTH_TOKEN != ''
         with:
           name: codex-cli
-          authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
+          authToken: '${{ env.CACHIX_AUTH_TOKEN }}'
           skipPush: true
 
       - name: Build package
@@ -46,11 +49,12 @@ jobs:
           
       - name: Verify package contents
         run: |
+          test -f ./result/codex-package.json
           test -f ./result/bin/codex
           test -x ./result/bin/codex-code-mode-host
-          test -x ./result/libexec/codex
-          test -x ./result/libexec/codex-code-mode-host
-          test -L ./result/bin/codex-code-mode-host
+          test -x ./result/codex-path/rg
+          test -x ./result/codex-resources/bwrap
+          test "$(jq -r .entrypoint ./result/codex-package.json)" = "bin/codex"
 
       - name: Run basic functionality test
         run: |

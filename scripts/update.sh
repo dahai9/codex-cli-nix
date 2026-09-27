@@ -286,10 +286,10 @@ parse_arguments() {
 }
 
 update_flake_lock() {
-    if command -v nix >/dev/null 2>&1; then
-        log_info "Updating flake.lock..."
-        nix flake update
-    fi
+    # The Codex release assets are fetched directly by package.nix. Updating
+    # unrelated flake inputs on every hourly release check creates noisy PRs
+    # and can introduce unrelated breakage, so keep the existing lock intact.
+    log_info "Keeping flake.lock unchanged; only package.nix release data changed."
 }
 
 show_changes() {
