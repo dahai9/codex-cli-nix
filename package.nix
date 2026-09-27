@@ -12,6 +12,7 @@
 , libcap
 , libz
 , bubblewrap
+, ripgrep
 , runtime ? "native"
 , nativeBinName ? "codex"
 , nodeBinName ? "codex-node"
@@ -163,19 +164,31 @@ stdenv.mkDerivation rec {
 
   installPhase = if runtime == "native" then ''
     runHook preInstall
-    mkdir -p $out/bin $out/libexec
-
-    # Keep the wrapped executable's basename canonical for process discovery.
-    # The code-mode host must remain next to the executable Codex actually runs.
-    cp build/codex "$out/libexec/${selected.binName}"
-    chmod +x "$out/libexec/${selected.binName}"
-    cp build/codex-code-mode-host $out/libexec/codex-code-mode-host
-    chmod +x $out/libexec/codex-code-mode-host
-    ln -s ../libexec/codex-code-mode-host $out/bin/codex-code-mode-host
-    makeWrapper "$out/libexec/${selected.binName}" "$out/bin/${selected.binName}" \
-      --run 'export CODEX_EXECUTABLE_PATH="$HOME/.local/bin/${selected.binName}"' \
-      --set DISABLE_AUTOUPDATER 1 \
-      ${lib.optionalString stdenv.hostPlatform.isLinux ''--prefix PATH : "${linuxRuntimePath}"''}
+    # Codex 0.157+ discovers daemon update/install support from the complete
+    # package layout next to the running executable.  Keep the native binary
+    # in that layout instead of hiding it behind a wrapper in libexec.
+    mkdir -p $out/bin $out/codex-path $out/codex-resources
+    cp build/codex "$out/bin/${selected.binName}"
+    chmod +x "$out/bin/${selected.binName}"
+    cp build/codex-code-mode-host "$out/bin/codex-code-mode-host"
+    chmod +x "$out/bin/codex-code-mode-host"
+    cp ${ripgrep}/bin/rg "$out/codex-path/rg"
+    chmod +x "$out/codex-path/rg"
+    ${lib.optionalString stdenv.hostPlatform.isLinux ''
+      cp ${bubblewrap}/bin/bwrap "$out/codex-resources/bwrap"
+      chmod +x "$out/codex-resources/bwrap"
+    ''}
+    cat > "$out/codex-package.json" <<EOF
+{
+  "layoutVersion": 1,
+  "version": "${version}",
+  "target": "${platform}",
+  "variant": "codex",
+  "entrypoint": "bin/${selected.binName}",
+  "resourcesDir": "codex-resources",
+  "pathDir": "codex-path"
+}
+EOF
     runHook postInstall
   '' else ''
     runHook preInstall
